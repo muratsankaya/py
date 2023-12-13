@@ -41,5 +41,60 @@ class Edge:
     def __hash__(self):
         return hash((self._origin, self._destination))
     
+class Graph:
+    def __init__(self, directed=False):
+        """
+        Create an empty graph 
+        By default a undirected graph
+        A directed graph if directed is True    
+        """
+        self._outgoing = {}
+
+        # if undirected set it to self._outgoing
+        self._incoming = {} if directed else self._outgoing
+
+    def is_directed(self):
+        """Returns true if it is a directed graph"""
+        return self._outgoing is not self._incoming
+    
+    def vertex_count(self):
+        """Returns the total number of verticies in the graph"""
+        return len(self._outgoing)
+    
+    def verticies(self):
+        """Returns an iterable object"""
+        return self._outgoing.keys()
+    
+    # version 1.1
+    # def edge_count(self):
+    #     total_edges = sum(len(indicie_map) for indicie_map in self._outgoing.values())
+    #     return total_edges if self.is_directed() else total_edges//2
+    
+    # version 1.2
+    def edge_count(self):
+        """Returns the total number of edges"""
+        total_edges = sum(len(self._outgoing[v]) for v in self._outgoing)
+        return total_edges if self.is_directed() else total_edges//2
+
+    def edges(self):
+        """Returns the set of all the edges"""
+        return {edge for v in self._outgoing for edge in self._outgoing[v].values()}
+            
+
+    def get_edge(self, u, v):
+        """Returns the edge that connects u to v"""
+        
+        # returns None if v is not accessible from u
+        return self._outgoing[u].get(v)
+    
+    def degree(self, v, outgoing=True):
+        pass
+    
+
+        
 
     
+
+
+
+
