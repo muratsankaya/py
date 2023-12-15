@@ -121,5 +121,19 @@ class Graph:
         return e
 
     def remove_vertex(self, v):
-        pass 
+        """Removes vertex v and all the incidents of v"""
+
+        # Only implementing for the directed case
+
+        # Remove all the incoming edges
+        for u in self._incoming.get(v):
+             self._outgoing[u].pop(v)
         
+        self._incoming.pop(v)
+
+        # Remove all the outgoing edges
+        for u in self._outgoing.get(v):
+            self._incoming[u].pop(v)
+
+        self._outgoing.pop(v)
+
