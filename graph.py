@@ -122,18 +122,24 @@ class Graph:
 
     def remove_vertex(self, v):
         """Removes vertex v and all the incidents of v"""
-
-        # Only implementing for the directed case
-
         # Remove all the incoming edges
         for u in self._incoming.get(v):
              self._outgoing[u].pop(v)
         
         self._incoming.pop(v)
 
-        # Remove all the outgoing edges
-        for u in self._outgoing.get(v):
-            self._incoming[u].pop(v)
+        # one of these operations is enough for the undirected case
+        if(self.is_directed()):
+            # Remove all the outgoing edges
+            for u in self._outgoing.get(v):
+                self._incoming[u].pop(v)
 
-        self._outgoing.pop(v)
+            self._outgoing.pop(v)
 
+    def remove_edge(self, e):
+        """Removes the edge from the graph"""
+        (u, v) = e.endpoints()
+        self._outgoing[u].pop(v)
+        self._incoming[v].pop(u)
+
+    
