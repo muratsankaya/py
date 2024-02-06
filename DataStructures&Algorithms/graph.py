@@ -1,4 +1,3 @@
-    
 class Graph:
     class Vertex:
         """Vertex structure for a graph"""
@@ -141,5 +140,4 @@ class Graph:
         (u, v) = e.endpoints()
         self._outgoing[u].pop(v)
         self._incoming[v].pop(u)
-
     
