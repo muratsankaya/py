@@ -1,4 +1,4 @@
-from main import minimax, minimax_with_alpha_beta
+from AI.GameAI.main import minimax, minimax_with_alpha_beta
 from tictactoe import TicTacToe
 import math
 import unittest

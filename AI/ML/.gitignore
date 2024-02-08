@@ -1,0 +1,9 @@
+**/data/
+**/feedback/
+**/tests/
+**/CITATIONS
+**/LATE_DAYS
+**/netid
+**/*.npy*
+**/output.ps
+**/password

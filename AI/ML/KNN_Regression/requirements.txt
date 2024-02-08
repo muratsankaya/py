@@ -1,0 +1,10 @@
+# for completing assignment
+filetype
+numpy
+pandas
+
+# for FRQs and test cases only
+fairlearn
+matplotlib
+pytest
+scikit-learn
