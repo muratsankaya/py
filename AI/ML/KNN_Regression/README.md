@@ -1,6 +1,6 @@
 # K Nearest Neighbors and Polynomial Regression
 
-This project includes: 
+#### This project includes: 
 
 - K Nearest Neighbors implementation with Eucledian, Manhattan and Cosine distance metrics 
 
@@ -9,3 +9,7 @@ This project includes:
 - Metric calculations for MSE, Demographic Parity and Equalized odds 
 
 - A Polynomial Regression model for single dimensional inputs
+
+- A Binary Perceptron Classifier Implementation
+
+- 
