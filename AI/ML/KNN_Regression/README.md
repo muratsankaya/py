@@ -10,6 +10,4 @@
 
 - A Polynomial Regression model for single dimensional inputs
 
-- A Binary Perceptron Classifier Implementation
 
-- 
