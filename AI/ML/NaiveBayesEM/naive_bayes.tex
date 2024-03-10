@@ -1,0 +1,446 @@
+\documentclass[12pt]{article}
+
+\usepackage[margin=2cm]{geometry}
+\usepackage{amsmath}
+\usepackage{amssymb}
+\usepackage{bbm}
+\usepackage{hyperref}
+
+\title{\vspace{-2cm}Naive Bayes and EM Algorithm}
+
+\author{By Zach Wood-Doughty;\\ adapted from
+a somewhat similar writeup by \href{http://www.cs.columbia.edu/~mcollins/em.pdf}{Michael
+Collins}}
+
+\date{February 24, 2024: v1}
+
+\begin{document}
+
+\maketitle
+
+\section{Introduction and notation}
+
+This note will recap the Naive Bayes method and derive the maximum-likelihood
+estimate in the fully-supervised setting. Then we will introduce the
+expectation-maximization (EM) algorithm for the case where (some) labels are
+missing from the training data.
+
+Suppose we want to use a dataset of email messages for the supervised learning
+task of classifying whether an email is spam. We'll represent our dataset of
+$N$ examples as $\{X_i, y_i\}_{i=1}^N$. $X_i$ is a vector of shape (1, $V$),
+where $X_{i, j}$ is a binary indicator of whether the $j$th word appears in
+email $i$, and $V$ is the number of words in our vocabulary. This is sometimes
+referred to as a ``bag-of-words'' representation. $y_i$ is the label for the
+corresponding email, which we will assume is either 1 (if spam) or 0 (if not).
+We'll assume there exists some (noisy) target function $f: X \to y$ such that
+$y_i = f(X_i)$, and our goal is to learn a hypothesis $h$ such that $h(X)
+\approx f(X)$. We'll denote the parameters of our model as $\Theta = \{\alpha,
+\beta\}$.  Our hypothesis $h(X)$ is uniquely determined these parameters, and
+our goal is to learn these parameters from the data such that $h(X)$ is as
+close as possible to $f(X)$.
+
+\section{The Naive Bayes model}
+
+Naive Bayes is a {\it generative} probabilistic model, meaning that it can
+model the entire distribution $p(X, y)$. This means we can use it both to
+predict the label of a test set example and sample new examples that should
+`look similar' to the existing examples. To make it easier to distinguish two
+kinds of parameters in our model, we will write $\Theta = \{\alpha, \beta\}$.
+The $\alpha$ parameters define the overall probability of the labels, with
+$p(y_i = y) = \alpha_y$. The $\beta$ parameters define the probability of ever
+seeing the $j$th word in a document with label $y$. So for a document with
+label $y_i$, we say $p(X_{i, j}=1 \mid Y=y_i) = \beta_{j, y_i}$. By rules of
+probability, $p(X_{i, j}=0 \mid Y=y_i) = (1 - \beta_{j, y_i})$
+
+In our example of binary spam classification, $p(y_i)$ is the baseline
+probability that an email is spam, {\it without} looking at the text of the
+email. So if on average only 1\% of emails are spam, we would want to learn
+$\alpha = [0.99, 0.01]$ such that $p(y_i=1) = \alpha_1 = 0.01$ for any
+$i$.\footnote{Note that it's possible to represent $\alpha$ as a single
+parameter rather than a vector of two parameters that sum to one. The homework
+test cases will expect you to represent this as a vector of two parameters;
+this will also make easier to use numpy's matrix multiplication operations.}
+
+$p(X_{i, j}=1 \mid Y=y_i; \beta)$ is the probability of $j$th word being
+used at least once in a document with label $y_i$. Because in this assignment
+we'll assume that $y$ is binary, $\beta$ is a matrix of shape $[V, 2]$ (where
+$V$ is again the
+size of the vocabulary).\footnote{If $y$ were not binary and instead
+had $K$ labels, then $\alpha$ would be an array of $K$ values that sum to 1, and
+$\beta$ would be a matrix of shape $[V, K]$.}
+For example, if ``jackpot'' is word 37 and appears once in every four
+spam emails but only once in every ten non-spam emails, then $\beta_{37} = [0.1, 0.24]$.
+
+Our goal is to find the values of $\alpha$ and $\beta$ that {\it best explain}
+the data that we have. Remember from lecture that we wrote the derivation for
+finding the maximum-likelihood $\Theta^*$ as:
+\begin{align}
+\Theta^* &= \arg\max_\Theta p(\Theta \mid X, y) \nonumber \\
+&= \arg\max_\Theta \dfrac{p(X, y \mid \Theta)p(\Theta)}{p(X, y)} \nonumber \\
+&= \arg\max_\Theta p(X, y \mid \Theta)p(\Theta) \label{eq:supervised_map} \\
+&= \arg\max_\Theta p(X, y \mid \Theta) \label{eq:supervised_mle}
+\end{align}
+
+In (\ref{eq:supervised_mle}), the $p(X, y \mid \Theta)$ term is referred the
+{\it likelihood} of the data, or the probability of seeing this particular
+dataset given our current parameters for the model.\footnote{In this
+derivation, (\ref{eq:supervised_map}) is the maximum a posteriori (MAP)
+estimate for $\Theta^*$. By dropping the prior (the $p(\Theta)$ term),
+we get the maximum likelihood estimate, which assumes that all $\Theta$
+values are equally likely. For this coding assignment, we will only consider
+maximum likelihood, not MAP.}
+While we will want to
+use our model to \emph{predict} $Y_i$ from $X_i$ using the conditional
+distribution $p(Y_i \mid X_i)$, our model parameters $\alpha$ and $\beta$
+represent $p(Y_i)$ and $p(X_i \mid Y_i)$.
+
+Because $X_i$ is a vector with $V$ values, writing out the entire conditional
+distribution would require ${\mathcal O}(2^V)$ parameters. For a reasonably
+large vocabulary of thousands of words, this is impossible. Instead, we will
+drastically simplify the problem by assuming that the occurrences of the $j$th
+word are {\it independent} of occurrences of all other words, conditional on
+the label $y$. This is an unrealistic ({\it naive}) assumption; for example, we
+might expect the word ``win'' to co-occur with the word ``jackpot'' in both
+spam and non-spam emails. The Naive Bayes assumption says no: $p(X_{i, j},
+X_{i, j'} \mid Y=y_i) = p(X_{i, j} \mid Y=y_i)p(X_{i, j'} \mid Y=y_i)$ for all
+words $j$ and $j'$. In plain language, we're assuming that whether ``jackpot''
+appears in a document depends {\it only} on whether the email is spam or not;
+it does not depend on any of the other words in the email. This assumption
+allows us to write:
+\begin{align}
+p(X_{i, 1}, X_{i, 2}, \ldots X_{i, V} \mid Y_i)
+&= \prod_{j=1}^V p(X_{i, j} \mid Y_i) \label{eq:naive_assumption}
+\end{align}
+
+Note that our data matrix $X$ is binary. That is, $X_{i, j}$ is one if document
+$i$ contains word $j$ and otherwise is zero. Even if the word $j$ shows up a
+thousand times in that document, $X_{i, j}$ is still just 1. However, when we
+are calculating the probability of the document, words that do not appear in
+that document still contribute to its probability. If $X_{i, j} = 0$, we use
+$p(X_{i, j} = 0 \mid Y=y_i)$ to quantify how likely it is that we would see a
+document with label $y_i$ that does not contain word $j$. We can use this to write:
+\begin{align}
+p(X_{i, j} &\mid Y=y_i, \beta) \nonumber \\
+&=p(X_{i, j}=1 \mid Y=y_i, \beta)^{(X_{i,j})}p(X_{i, j}=0 \mid Y=y_i, \beta)^{(1 - X_{i,j})} \\
+\Rightarrow \log p(X_{i, j} &\mid Y=y_i, \beta) \nonumber \\
+&=\log p(X_{i, j}=1 \mid Y=y_i, \beta)^{(X_{i,j})} + \log p(X_{i, j}=0 \mid Y=y_i, \beta)^{(1 - X_{i,j})} \nonumber \\
+&= (X_{i, j}) \log p(X_{i, j}=1 \mid Y=y_i, \beta) + (1 - X_{i, j}) \log p(X_{i, j}=0 \mid Y=y_i, \beta) \nonumber \\
+&= X_{i, j} \log \beta_{j, y_i} + (1 - X_{i, j}) \log (1 - \beta_{j, y_i}) \label{eq:prob_one_word}
+\end{align}
+
+We can put this all together to connect $\Theta^* = \{\alpha^*, \beta^*\}$
+for our dataset of $N$ examples as follows:
+\begin{align}
+\{\alpha^*, \beta^*\}
+&= \arg\max_{\alpha, \beta} \prod_{i=1}^N p(X_i, y_i \mid \alpha, \beta) \nonumber \\
+&= \arg\max_{\alpha, \beta} \prod_{i=1}^N p(y_i \mid \alpha)p(X_i \mid y_i, \beta) \nonumber \\
+&= \arg\max_{\alpha, \beta} \log\prod_{i=1}^N p(y_i \mid \alpha)p(X_i \mid y_i, \beta)
+\label{eq:use_log}\\
+&= \arg\max_{\alpha, \beta} \sum_{i=1}^N \Large(\log p(y_i \mid \alpha) + \log p(X_i \mid y_i, \beta)\Large) \nonumber \\
+&= \arg\max_{\alpha, \beta} \sum_{i=1}^N \log p(y_i \mid \alpha) 
+  + \sum_{i=1}^N \log p(X_i \mid y_i, \beta) \nonumber \\
+&= \arg\max_{\alpha, \beta} \sum_{i=1}^N \log p(y_i \mid \alpha) 
+  + \sum_{i=1}^N \sum_{j=1}^V \log p(X_{i, j} \mid y_i, \beta) \nonumber \\
+&= \arg\max_{\alpha, \beta} \sum_{i=1}^N \log \alpha_{y_i}
+  + \sum_{i=1}^N \sum_{j=1}^V \Huge(X_{i, j} \log \beta_{j, y_i} + (1 - X_{i, j})
+  \log (1 - \beta_{j, y_i})\Huge) \label{eq:sup_likelihood} \\
+&= \arg\max_{\alpha, \beta} {\mathcal L}(X, y, \alpha, \beta) \nonumber
+\end{align}
+
+We'll use ${\mathcal L}(X, y, \alpha, \beta)$ to denote the log likelihood of
+the data and our specific parameters $\alpha$ and $\beta$. Fitting our model
+will be the process of finding $\arg\max_{\alpha, \beta} {\mathcal L}$.  Note
+that (\ref{eq:use_log}) holds because log is monotonic (i.e., $\arg \max_x f(x)
+= \arg \max_x \log f(x)$). Equation (\ref{eq:sup_likelihood}) holds by plugging
+in (\ref{eq:prob_one_word}).
+
+Once we have learned $\alpha^*$ and $\beta^*$, we'll want to be able to use it
+to predict if an email is spam. This can be written as $p(y_i \mid X_i)$, or
+``what is the probability that the label $y_i$ is 1 or 0 given that the email's
+text is $X_i$?'' You might have noticed that we our parameters $\alpha$ and
+$\beta$ aren't defined in terms of the probability distribution $p(y_i \mid
+X_i)$, but rather $p(y_i)$ and $p(X_{i,j} \mid y_i)$. This is because it's
+easier to track parameters in this way. We can write the probability that a
+document with text $X_i$ has label $k$ as:
+
+\begin{align}
+p(Y=k \mid X_i) &= \dfrac{p(Y=k | \alpha)p(X_i \mid Y=k, \beta)}{p(X_i)}
+= \dfrac{p(k | \alpha)p(X_i \mid k, \beta)}{\sum_{y'=1}^2 p(y' | \alpha)p(X_i \mid y', \beta)}
+\label{eq:sup_prediction} \\[0.2em]
+\log p(Y=k \mid X_i) &= \log p(k | \alpha) + \log p(X_i \mid k, \beta)  -
+\log\left(\sum_{y'=1}^2 p(X_i \mid y', \beta)p(y' | \alpha)\right) \label{eq:predict_proba_w_denom} \\
+&\propto \log p(k | \alpha) + \log p(X_i \mid k, \beta) \label{eq:predict_proba_no_denom} \\
+&= \log p(Y=k | \alpha) + \sum_{j=1}^V \log p(X_{i,j} \mid k, \beta) \nonumber \\
+&= \log \alpha_{k} + \sum_{j=1}^V \left(X_{i, j} \log \beta_{j, k} + (1 - X_{i, j}) \log (1 - \beta_{j, k}) \right)
+\label{eq:predict_proba}
+\end{align}
+
+Before equation (\ref{eq:predict_proba_no_denom}), the $\propto$ symbol means
+``is proportional to''; this is true because the summation inside the log term
+in (\ref{eq:predict_proba_w_denom}) is the same for all $X_i$, regardless of
+the label being predicted. In your implementation, you can calculate $\log
+p(Y=k \mid X_i)$ using (\ref{eq:predict_proba}) for both possible values of
+$y_i$, and then use your {\tt softmax} function to turn these unnormalized log
+probabilities into probabilities between 0 and 1.
+
+Hint: if you want to make these calculations maximally efficient, you can
+calculate $\sum_{j=1}^V X_{i, j} \log \beta_{j, k}$ and $\sum_{j=1}^V (1
+- X_{i, j}) \log (1 - \beta_{j, k})$ each as separate matrix multiplications.
+The {\tt flip\_bits\_sparse\_matrix} function we provide in the starter code will
+make it easy to compute $1 - X_{i, j}$.
+
+\section{Fully-supervised Naive Bayes updates}
+
+Remember that our dataset looks like $\{X_i, y_i\}_{i=1}^N$ and we've thus far
+assumed that every $X_i$ has a corresponding $y_i$. In this setting, how do we
+learn good values for $\alpha$ and $\beta$? It turns out it is a reasonably
+simple process of counting:
+
+\begin{align}
+\alpha_y &= \frac{1}{N} \sum_{i=1}^N \mathbbm{1}(y_i = y) \label{eq:sup_alpha} \\
+\beta_{j, y} &= \dfrac{\sum_{i=1}^N X_{i, j} \mathbbm{1}(y_i = y)}{\sum_{i=1}^N
+\mathbbm{1}(y_i = y)}\label{eq:sup_beta}
+\end{align}
+
+Note that $\mathbbm{1}(Z)$ is an {\it indicator} function which takes the value
+1 if $Z$ is true and 0 if $Z$ is false. In plain language, we can read our
+estimate for $\alpha_y$ as, ``among the dataset we have, what proportion of
+documents have label $y$?'' We can similarly read $\beta_{j, y}$ as ``among all
+documents we have with label $y$, what proportion contain at least one
+occurrence of the word $j$?''
+
+\subsection{Smoothing}
+
+Especially when we have a small number of documents or a large vocabulary size,
+there may be some combinations of $y$ and $j$ such that we never see word $j$
+in a document with label $y$. In that setting, we learn that $\beta_{j, y} = 0$
+and thus $\log \beta_{j, y} = -\inf$. In plain language, we learn that it is
+\emph{impossible} for word $j$ to appear in a document with label $y$. If we
+ever see a document with word $j$, our model says it must have a 0\% chance of
+having label $y$. This is bad; we don't want to draw such a strong conclusion
+from limited evidence. Equally bad is if every document with label $y$ contains
+word $j$: our model will learn that it is impossible for a document with
+label $y$ to \emph{not contain} word $j$.
+
+To avoid these issues, we introduce \emph{smoothing}. Let
+$\lambda$ be the amount of smoothing. We can replace (\ref{eq:sup_beta}) with the following:
+\begin{align}
+\beta_{j, y} &= \dfrac{\lambda + \sum_{i=1}^N X_{i, j} \mathbbm{1}(y_i =
+y)}{2\lambda + \sum_{i=1}^N \mathbbm{1}(y_i = y)}\label{eq:sup_beta_smooth}
+\end{align}
+
+Essentially, smoothing pretends that for each possible label (i.e., spam or not
+spam), we see $2\lambda$ new documents. In $\lambda$ of those, our imagined
+documents have \emph{every possible word}.  In the other $\lambda$, our
+imagined documents have \emph{no words}. Setting $\lambda > 0$ is sufficient to
+ensure that our model never believes that any event is impossible. As $\lambda
+\to \infty$, our $\beta$ values will converge to 0.5 for all words.
+
+% A derivation of these updates is shown in Appendix \ref{sec:supervised_derivation}.
+
+\section{Fully-unsupervised Naive Bayes}
+
+Suppose we have no labels for our documents, but we want to use these same
+definitions of $\alpha$ and $\beta$.  Instead of $y$ being the observed labels,
+we will treat them as unobserved (latent) variables that define clusters which
+separate the data into groups. How does this change our derivation from
+(\ref{eq:sup_likelihood})? For each example in our dataset, we need to consider
+the probability it has label $y'$, for all possible values of $y'$! We can
+write our \emph{unsupervised} log likelihood as:
+
+\begingroup
+\thinmuskip=1mu plus 1mu
+\medmuskip=3mu plus 2mu minus 4mu
+\thickmuskip=3mu plus 3mu
+\begin{align}
+{\mathcal L}&(X, \alpha, \beta) \nonumber \\
+&= \log \prod_{i=1}^N p(X_i \mid \alpha, \beta) \nonumber \\
+&= \log \prod_{i=1}^N \sum_{y'=1}^2 p(X_i, y_i=y' \mid \alpha, \beta) \nonumber \\
+%
+&= \log \prod_{i=1}^N \sum_{y'=1}^2 p(y_i = y' \mid X_i, \alpha, \beta)
+p(y' \mid \alpha) \prod_{j=1}^V p(X_{i, j} \mid y', \beta) \label{eq:unsup_likelihood_py_given_x} \\
+%
+&= \sum_{i=1}^N \log \sum_{y'=1}^2 p(y' \mid X_i, \alpha, \beta)
+p(y' \mid \alpha) \prod_{j=1}^V p(X_{i, j} \mid y', \beta) \nonumber \\
+%
+&= \sum_{i=1}^N \log \sum_{y'=1}^2 \exp\log \left( p(y' \mid X_i, \alpha,
+\beta) p(y' \mid \alpha) \prod_{j=1}^V p(X_{i, j} \mid y', \beta)\right) \label{eq:explog} \\
+%
+&= \sum_{i=1}^N \log \sum_{y'=1}^2 \exp \left( \log p(y' \mid X_i, \alpha, \beta) +
+\log p(y' \mid \alpha) + \sum_{j=1}^V \log p(X_{i, j} \mid y', \beta) \right) \nonumber \\
+%
+&= \sum_{i=1}^N \log \sum_{y'=1}^2 \exp\left(\log p(y' \mid X_i, \alpha, \beta) +
+\log \alpha_{y'} + \sum_{j=1}^V \left[X_{i, j} \log \beta_{j, y'} + (1 - X_{i, j})
+  \log (1 - \beta_{j, y'})\right]\right)
+\label{eq:unsup_likelihood}
+\end{align}
+\endgroup
+
+
+If you compare (\ref{eq:unsup_likelihood}) against (\ref{eq:sup_likelihood}),
+you should see many similarities. However, there are important differences.
+First,  we cannot distribute the $\log$ inside the
+$\sum_{y'=1}^2$.  To maintain similarity to our previous derivation, we will
+add in an awkward $\exp\log$ in (\ref{eq:explog}). This means we have an
+$\exp()$ function inside this equation, that we cannot get rid of. If $V$ is
+large, the summation over $V$ in (\ref{eq:unsup_likelihood}) may be a large
+negative number, and exponentiating it may result in underflow. You will solve
+this problem in the {\tt stable\_log\_sum} function you write in {\tt
+src/utils.py}.
+
+A second crucial difference is that our $y_i$ variables are latent, and so we
+will estimate them using our $p(y_i \mid X_i, \alpha, \beta)$. You can
+connect this back to (\ref{eq:sup_likelihood}) by imagining that when we are
+given a fully-supervised dataset, that $p(y_i = y' \mid X_i, \alpha, \beta)$
+is either 0 or 1 depending on whether $y_i$ is in fact $y'$ or not. When
+our $y_i$ labels are latent, we need to predict a distribution over these $y'$
+labels. The challenge this introduces is that our likelihood now has three terms
+in it that are `trapped' together inside the $\exp$ function: two depend on $\alpha$,
+and two depend on $\beta$. This means we cannot compute derivatives directly,
+and will need to turn to the EM algorithm to optimize $\alpha$ and $\beta$.
+
+We see in lecture that the general form of the EM algorithm involves
+alternating between two steps: first we will find the {\it expectation} of the
+unobserved values given our current model parameters, then we will pretend
+those are the true values and use them to find ({\it maximize} for) better
+model parameters.
+We saw Gaussian Mixture Models (GMMs) as an example of the EM algorithm, where
+the first (``E'') step involved assigning each data point to a cluster based on
+the current location of the clusters, and the second (``M'') step involved
+updating the parameters of each cluster based on the points assigned to it.
+
+For fully-unsupervised Naive Bayes, we will take a similar approach. We start by
+initializing our model parameters somehow, and then in the E-step we use those
+parameters to predict $p(y_i \mid X_i, \alpha, \beta)$ for every example $i$.
+These predicted probabilities are our latent variables.
+In the M-step, we treat those predicted probabilities as fixed, and use them
+to update our $\alpha$ and $\beta$ values. We keep iterating between E and M
+steps until the algorithm converges. The algorithm is described in Figure
+\ref{fig:unsup_em}.
+
+\begin{figure}[h]
+\fbox{
+\begin{minipage}{\dimexpr \textwidth-2\fboxsep-2\fboxrule}
+{\bf Inputs:}
+\begin{itemize}
+\item A dataset $\{X_i\}_{i=1}^N$, where $X$ has shape $[N, V]$.
+\item A value $K$ of the number of labels to consider; in this assignment, $K=2$.
+\item A maximum number of iterations $T$.
+\end{itemize}
+\vspace{1em}
+
+{\bf Initialization:}
+\begin{itemize}
+\item Initialize $\alpha^0 = p(y_i = y') = \frac{1}{K}$ for all $i$ and $y'$.
+\item Initialize $\beta^0 = p(X_{i, j} \mid y_i = y') = \frac{1}{2}$ for all $i,
+j,$ and $y'$.
+\end{itemize}
+\vspace{1em}
+
+{\bf Algorithm:} \\
+For $t=0 \ldots T$ or until convergence,\\
+
+\setlength{\leftskip}{1cm}
+{\bf E-step}: For all $i$ and $y'$, compute:
+\begin{align}
+&p(y_i = y' \mid X_i, \alpha^t, \beta^t) \propto
+p(X_i \mid y_i=y', \beta^t)p(y_i=y' \mid \alpha^t) \label{eq:unsup_estep}
+\end{align}
+
+{\bf M-step}: For all $y'$ and $j$, compute:
+\begin{align}
+\alpha_{y'}^{t+1} &= \frac{1}{N} \sum_{i=1}^N p(y_i = y' \mid X_i, \alpha^t, \beta^t)
+\label{eq:unsup_alpha} \\
+\beta_{j, y'}^{t+1} &= \dfrac{\lambda + \sum_{i=1}^N X_{i, j} \; p(y_i = y'
+\mid X_i, \alpha^t, \beta^t)}{2\lambda + \sum_{i=1}^N p(y_i = y' \mid X_i, \alpha^t, \beta^t)}
+\label{eq:unsup_beta}
+\end{align}
+\setlength{\leftskip}{0cm}
+\end{minipage}
+}
+\caption{The EM algorithm for fully-unsupervised Naive Bayes.
+Note that (\ref{eq:unsup_estep}) is essentially identical to (\ref{eq:sup_prediction}). 
+Note the close similarity between (\ref{eq:unsup_alpha}) and (\ref{eq:sup_alpha})
+and between (\ref{eq:unsup_beta}) and (\ref{eq:sup_beta}).}
+\label{fig:unsup_em}
+\end{figure}
+
+\section{Semi-supervised Naive Bayes}
+
+Your homework considers a setting where we have \emph{some} examples
+$i$ for which we see $y_i$, which requires a slight modification. If we have
+a label $y_i$, use it; if not, predict it using $p(y_i = y' \mid X_i, \alpha^t, \beta^t)$.
+It is crucially important {\bf not to overwrite} the true $y_i$ with our
+E-step predictions. At each time $t$, $p(y_i = y' \mid X_i, \alpha^t, \beta^t)$
+will {\it either} be a prediction based on our current $\alpha^t$ and
+$\beta^t$, {\it} or it will be the true $y_i$ labels that were given to us at
+the beginning.
+Use the semi-supervised algorithm in Figure \ref{fig:semisup_em} to guide your
+implementation of {\tt fit()} in {\tt src/naive\_bayes\_em.py}.
+This is almost identical to the unsupervised model, except
+(\ref{eq:semisup_estep1}) and (\ref{eq:semisup_estep2}) replace
+(\ref{eq:unsup_estep}).
+If we have a label $y_i$, we use it:
+saying $p(y_i = y' \mid X_i, \alpha, \beta)$ is 1 if $y_i$ is equal to
+$y'$, or else 0. For unlabeled examples, we infer a
+distribution over possible values $y'$ and treat $y_i$ as a latent variable.
+
+\begin{figure}[h]
+\fbox{
+\begin{minipage}{\dimexpr \textwidth-2\fboxsep-2\fboxrule}
+{\bf Inputs:}
+\begin{itemize}
+\item A dataset $\{X_i, y_i\}_{i=1}^N$, where $X$ has shape $[N, V]$ and $y$
+has shape $[N, 1]$; each $y_i$ can take a special value of ``?'' (i.e., {\tt np.nan}) if the $i$th example has no label.
+\item A maximum number of iterations $T$.
+\end{itemize}
+% \vspace{1em}
+
+{\bf Initialization:}
+\begin{itemize}
+\item Initialize $\alpha^0 = p(y_i = y') = \frac{1}{K}$ for all $i$ and $y'$.
+\item Initialize $\beta^0 = p(X_{i, j} \mid y_i = y') = \frac{1}{2}$ for all $i,
+j,$ and $y'$.
+\end{itemize}
+% \vspace{1em}
+
+{\bf Algorithm:} \\
+For $t=0 \ldots T$ or until convergence,\\
+
+\setlength{\leftskip}{1cm}
+{\bf E-step}: For all $i$ such that $y_i = \text{?}$, for all $y'$, compute:
+\begin{align}
+&p(y_i = y' \mid X_i, \alpha^t, \beta^t) \propto
+p(X_i \mid y_i=y', \beta^t)p(y_i=y' \mid \alpha^t) \label{eq:semisup_estep1}
+\end{align}
+
+Then, for all $i$ such that $y_i \neq \text{?}$, define
+\begin{align}
+&p(y_i = y' \mid X_i, \alpha^t, \beta^t) = 
+\begin{cases} 
+      1 & y' = y_i\\
+      0 & \text{otherwise}
+\end{cases}
+\label{eq:semisup_estep2}
+\end{align}
+
+{\bf M-step}: For all $y'$ and $j$, compute:
+\begin{align}
+\alpha_{y'}^{t+1} &= \log \left(\frac{1}{N} \sum_{i=1}^N p(y_i = y' \mid X_i, \alpha^t, \beta^t)\right)
+\label{eq:semisup_alpha} \\
+\beta_{j, y'}^{t+1} &= \dfrac{\lambda + \sum_{i=1}^N X_{i, j} \; p(y_i = y'
+\mid X_i, \alpha^t, \beta^t)}{2\lambda + \sum_{i=1}^N p(y_i = y' \mid X_i, \alpha^t, \beta^t)}
+\label{eq:semisup_beta}
+\end{align}
+\setlength{\leftskip}{0cm}
+\end{minipage}
+}
+\caption{The EM algorithm for semi-supervised Naive Bayes. Note that
+(\ref{eq:unsup_alpha}) is identical to (\ref{eq:semisup_alpha}) and
+(\ref{eq:unsup_beta}) is identical to (\ref{eq:semisup_beta}), except that
+$p(y_i \mid X_i, \alpha^t, \beta^t)$ is defined differently in the E-step.
+}
+\label{fig:semisup_em}
+\end{figure}
+
+\end{document}
