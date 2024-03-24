@@ -1,0 +1,10 @@
+#for completing assignment
+numpy
+pandas
+matplotlib
+gymnasium>=0.29.1
+
+#for test cases and free-response questions
+filetype
+pytest
+scikit-learn
