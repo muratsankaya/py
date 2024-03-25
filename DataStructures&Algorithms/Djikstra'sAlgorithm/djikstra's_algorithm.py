@@ -28,15 +28,26 @@ def relax(u, v, w, p, d, G, Q):
 
 def dijkstra(G, s, w=get_weight):
     d, predecessor = initialize_single_source(G, s)
-    S = set()
     Q = pqdict({vertex: d[vertex] for vertex in G})
     while Q:
         u, _ = Q.popitem()
-        S.add(u)
         for vertex in G[u]:
             relax(u, vertex, w, predecessor, d, G, Q)
 
     return d, predecessor
+
+# set S is used for theorotical reasons
+# def dijkstra(G, s, w=get_weight):
+#     d, predecessor = initialize_single_source(G, s)
+#     S = set()
+#     Q = pqdict({vertex: d[vertex] for vertex in G})
+#     while Q:
+#         u, _ = Q.popitem()
+#         S.add(u)
+#         for vertex in G[u]:
+#             relax(u, vertex, w, predecessor, d, G, Q)
+
+#     return d, predecessor
 
 G1 = {
     's': {'y': 5, 't': 10},
