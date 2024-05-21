@@ -3,8 +3,12 @@ import random
 def quick_sort_retry(arr):
     """
     A better version of randomized Quicksort
-    Wort Case runtime O(n^2)
-    Expected Case runtime O(nlogn)
+    Wort Case runtime: O(n^2)
+    Expected Case runtime: O(nlogn)
+    High probability bound: O(nlogn)
+    
+    The key idea is that the while loop
+    is expected to run 2 times.
     """
     n = len(arr)
 
@@ -36,8 +40,8 @@ def quick_sort_retry(arr):
 def rand_quick_sort(arr):
     """
     A worse version of randomized QuickSort
-    Wort Case runtime O(n^2)
-    Expected Case runtime O(n^2)
+    Wort Case runtime: O(n^2)
+    Expected Case runtime: O(n^2)
     """
     n = len(arr)
 
