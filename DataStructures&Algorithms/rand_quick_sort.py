@@ -9,9 +9,15 @@ def quick_sort_retry(arr):
     
     The key idea is that the while loop
     is expected to run 2 times.
+
+    X = "Number of iterations before choosing a valid pivot"
+    E[X] = 1/p  # X is g.r.v
+    p = 1/2 because we want pivot to be between the range [1/4, 3/4]
+    3/4 - 1/4 = 2/4 = 1/2
+    Hence the expected number of iterations is 2.
     """
     n = len(arr)
-
+    
     if n <= 1:
         return arr
     
