@@ -1,0 +1,8 @@
+filetype
+numpy
+pandas
+
+torch
+scikit-learn
+pytest
+matplotlib
