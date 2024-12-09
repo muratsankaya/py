@@ -1,0 +1,56 @@
+
+1a. At first, as a benchmark, I gathered up the settings used in the previous tests that were provided as a part of the repo. 
+
+The initial settings were setup to:
+
+model_args = {
+    "number_of_hidden_layers": 1,
+    "input_size": 2,
+    "hidden_size": 10,
+    "activation": torch.nn.Sigmoid(),
+}
+
+trainer_args = {
+    "optimizer": torch.optim.SGD,
+    "lr": 0.1,
+}
+
+This setting did pretty badly. Remembering from the first HW that adjusting the activation function had enabled me to 
+get a significant improvement, the first change I made was setting the activation function to torch.nn.ReLU() . 
+Quite interestingly I kept getting nan as output of the loss function. I tried with torch.nn.LeakyReLU() but kept getting
+nans. I tried debugging but couldn't figure out the reason for this. So I reverted to the initial setup. Then, I first played around
+with the size of the model: number_of_hidden_layers, input_size, which did not affect loss much. I played around with the learning rate
+but still was not able to get it perform significantly better. In the meantime I adjusted the initialization of weights, I initially
+had used torch.nn.init.uniform_, I changed that to torch.nn.init.normal_ which did show a significant improvement. I further tried
+adjusting the bias terms as well which also led to significant improvement. I was not however able to pass tests. I was actually
+quite far from it. While I was staring at the parameters, thinking why using ReLU was leading to nan; it came to my mind that in the
+the first HW the optimizer choice was Adam and I did not ever have the issue of nan. I changed the optimizer to Adam and adjusted
+the activation function to ReLU, boom the loss got much better. This change definitely had the most impact by far. I was still not
+able to pass the tests, but I was getting there. After this adjustment I played around with the learning rate, model 
+architecture (dimensions), for the final touch I had to decrease the the size of the model, by setting the hidden_layer size to 8.
+(while I'm writing this I tried setting the hidden layer size to 4 and got 100% acc, it was like around 99.9% with 8). 
+
+I did some research trying to understand why using SGD lead to nans where using Adam worked well. I checked the algorithms
+for both optimizers, well SGD I knew from lectures, Adam is little more involved. I did not went in to much detail on how 
+Adam works, but reading some comments, I realized that Adam uses estimates to adapt the learning rate preventing large updates
+that can cause exploding gradients. Which what was likely hapenning when I was using ReLU with SGD with a learning rate of
+0.05. Which is considered high. I tried adjusing the learning rate, when I used a learning rate that was 100,000 times smaller;
+ReLU with SGD actually converged faster than ReLU with Adam. When I used a small learning rate for Adam
+it did much worse. I think this lead me to an intuition that slightly larger laerning rates are better for Adam and smaller ones 
+for SGD.
+
+Overall changing the activation function and the learning rate, and somewhat the size/architecture
+(I think up to a point size does not matter too much like having a layer of size 4 or 8 did not matter too much they both did well) 
+had a the most effect which what 
+I have also realized in HW1. However, I tend to believe that the most important thing is to know the context of your problem 
+really well and also the tools that you are using. The tools should not be used as black boxes. For example, for the first 
+HW understanding the idea of pretraining lead me to get 100% validation accruacy. Here I was dramatically failing using SGD, then 
+I realized the differences between SGD and Adam, and that lead me to adjust the lr for SGD, which eventually improved the model 
+as it converged faster.
+
+
+1b. I tried exactly the same parameters that I have used for the adddataset, initially I failed the tests, but then I realized that
+the code provided in the save_model_without_deleting module. Was using quite a few examples(100) and epochs(100). I increased
+the number of examples to 1000 and epochs to 200, and I was able to pass the test with the parameters I used for add dataset.
+Interestingly, however, with the optimizer set to SGD and a learning rate of 0.0000005 the add dataset model was able to converge
+faster(it reachead 100% after 120 epochs). Same setting for the multiply dataset did much worse. It was not able to pass the test.
