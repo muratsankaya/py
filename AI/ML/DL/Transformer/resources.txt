@@ -1,0 +1,4 @@
+https://jalammar.github.io/illustrated-transformer/
+https://nlp.seas.harvard.edu/2018/04/03/attention.html
+https://www.datacamp.com/tutorial/building-a-transformer-with-py-torch
+https://towardsdatascience.com/how-to-code-the-transformer-in-pytorch-24db27c8f9ec
