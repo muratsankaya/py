@@ -5,8 +5,6 @@ and stores it in a variable called wmt14
 
 """
 
-import pandas as pd
-import matplotlib.pyplot as plt
 from datasets import load_dataset
 
 wmt14_train = load_dataset("wmt14", "de-en", split="train")
