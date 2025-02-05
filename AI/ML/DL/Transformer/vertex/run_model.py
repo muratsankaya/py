@@ -1,14 +1,14 @@
 from torch.utils.data import DataLoader
 from torch.optim import Adam, lr_scheduler
 from torch.nn import CrossEntropyLoss
-from vertex.data.tokenizer_helinski_nlp_opus import (
+from data.tokenizer_helinski_nlp_opus import (
     wmt14_train_subset,
     wmt14_test_subset,
     wmt14_validation_subset,
     tokenizer,
 )
-from vertex.transformer import Transformer
-from vertex.trainer import Trainer
+from transformer import Transformer
+from trainer import Trainer
 
 batch_size = 16
 # print(tokenizer.vocab_size)

@@ -29,22 +29,3 @@ for i in range(2):
 print("\nprinting 2 examples from the validation dataset")
 for i in range(2):
     print(wmt14_validation[i])
-
-# # Convert the 'train' split to a DataFrame
-# df_train = pd.DataFrame(wmt14["train"])
-
-# # Display the first 5 rows
-# print(df_train.head())
-
-# # Calculate sentence lengths
-# en_lengths = [len(ex["translation"]["en"].split()) for ex in wmt14["train"]]
-# de_lengths = [len(ex["translation"]["de"].split()) for ex in wmt14["train"]]
-
-# # Plot histograms
-# plt.hist(en_lengths, bins=50, alpha=0.5, label="English")
-# plt.hist(de_lengths, bins=50, alpha=0.5, label="German")
-# plt.xlabel("Sentence Length")
-# plt.ylabel("Frequency")
-# plt.legend(loc="upper right")
-# plt.title("Sentence Length Distribution")
-# plt.show()

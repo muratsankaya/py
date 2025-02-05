@@ -1,7 +1,7 @@
 import torch
 import numpy as np
 from torcheval.metrics.functional.text import perplexity
-from src.utils import save, load
+from utils import save, load
 import time
 
 device = "cpu"
